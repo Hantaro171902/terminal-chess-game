@@ -5,7 +5,7 @@
 using namespace std;
 
 string board[64];
-string redBg = "\033[41m"; // red background
+string redBg = "\033[41m";   // red background
 string whiteBg = "\033[47m"; // white background
 string blackBg = "\033[40m"; // black background
 string greenBg = "\033[42m"; // green background for moves
@@ -75,23 +75,163 @@ int posToIndex(string pos)
     return row * 8 + col;
 }
 
+bool isInsideBoard(int row, int col)
+{
+    return row >= 0 && row < 8 && col >= 0 && col < 8;
+}
+
 vector<int> getPossibleMoves(int index)
 {
     vector<int> moves;
     string piece = board[index];
+    int row = index / 8;
+    int col = index % 8;
 
-    
     if (piece == "♙")
-    {
-        // White pawn simple move
-        int row = index / 8;
-        int col = index % 8;
-        if (row > 0 && board[(row - 1) * 8 + col] == " ")
-        {
+    { // White pawn
+        if (isInsideBoard(row - 1, col) && board[(row - 1) * 8 + col] == " ")
             moves.push_back((row - 1) * 8 + col);
+    }
+    else if (piece == "♖")
+    { // Rook
+        // Up
+        for (int r = row - 1; r >= 0; --r)
+        {
+            int i = r * 8 + col;
+            if (board[i] == " ")
+                moves.push_back(i);
+            else
+                break;
+        }
+        // Down
+        for (int r = row + 1; r < 8; ++r)
+        {
+            int i = r * 8 + col;
+            if (board[i] == " ")
+                moves.push_back(i);
+            else
+                break;
+        }
+        // Left
+        for (int c = col - 1; c >= 0; --c)
+        {
+            int i = row * 8 + c;
+            if (board[i] == " ")
+                moves.push_back(i);
+            else
+                break;
+        }
+        // Right
+        for (int c = col + 1; c < 8; ++c)
+        {
+            int i = row * 8 + c;
+            if (board[i] == " ")
+                moves.push_back(i);
+            else
+                break;
         }
     }
-    // Add more rules for other pieces later
+    else if (piece == "♗")
+    { // Bishop
+        // 4 diagonals
+        for (int dr = -1, dc = -1; isInsideBoard(row + dr, col + dc); --dr, --dc)
+        {
+            int i = (row + dr) * 8 + (col + dc);
+            if (board[i] == " ")
+                moves.push_back(i);
+            else
+                break;
+        }
+        for (int dr = -1, dc = 1; isInsideBoard(row + dr, col + dc); --dr, ++dc)
+        {
+            int i = (row + dr) * 8 + (col + dc);
+            if (board[i] == " ")
+                moves.push_back(i);
+            else
+                break;
+        }
+        for (int dr = 1, dc = -1; isInsideBoard(row + dr, col + dc); ++dr, --dc)
+        {
+            int i = (row + dr) * 8 + (col + dc);
+            if (board[i] == " ")
+                moves.push_back(i);
+            else
+                break;
+        }
+        for (int dr = 1, dc = 1; isInsideBoard(row + dr, col + dc); ++dr, ++dc)
+        {
+            int i = (row + dr) * 8 + (col + dc);
+            if (board[i] == " ")
+                moves.push_back(i);
+            else
+                break;
+        }
+    }
+    else if (piece == "♘")
+    { // Knight
+        int movesKnight[8][2] = {
+            {-2, -1}, {-2, 1}, {-1, -2}, {-1, 2}, {1, -2}, {1, 2}, {2, -1}, {2, 1}};
+        for (auto m : movesKnight)
+        {
+            int r = row + m[0];
+            int c = col + m[1];
+            if (isInsideBoard(r, c) && board[r * 8 + c] == " ")
+                moves.push_back(r * 8 + c);
+        }
+    }
+    else if (piece == "♕")
+    { // Queen
+        // Rook + Bishop moves
+        highlightSquares.clear();
+        vector<int> rookMoves = getPossibleMoves(index); // Call rook code manually or inline
+        highlightSquares = rookMoves;
+        // Diagonals manually as Bishop
+        for (int dr = -1, dc = -1; isInsideBoard(row + dr, col + dc); --dr, --dc)
+        {
+            int i = (row + dr) * 8 + (col + dc);
+            if (board[i] == " ")
+                moves.push_back(i);
+            else
+                break;
+        }
+        for (int dr = -1, dc = 1; isInsideBoard(row + dr, col + dc); --dr, ++dc)
+        {
+            int i = (row + dr) * 8 + (col + dc);
+            if (board[i] == " ")
+                moves.push_back(i);
+            else
+                break;
+        }
+        for (int dr = 1, dc = -1; isInsideBoard(row + dr, col + dc); ++dr, --dc)
+        {
+            int i = (row + dr) * 8 + (col + dc);
+            if (board[i] == " ")
+                moves.push_back(i);
+            else
+                break;
+        }
+        for (int dr = 1, dc = 1; isInsideBoard(row + dr, col + dc); ++dr, ++dc)
+        {
+            int i = (row + dr) * 8 + (col + dc);
+            if (board[i] == " ")
+                moves.push_back(i);
+            else
+                break;
+        }
+    }
+    else if (piece == "♔")
+    { // King
+        int drs[] = {-1, -1, -1, 0, 0, 1, 1, 1};
+        int dcs[] = {-1, 0, 1, -1, 1, -1, 0, 1};
+        for (int d = 0; d < 8; ++d)
+        {
+            int r = row + drs[d];
+            int c = col + dcs[d];
+            if (isInsideBoard(r, c) && board[r * 8 + c] == " ")
+                moves.push_back(r * 8 + c);
+        }
+    }
+
     return moves;
 }
 
@@ -107,6 +247,7 @@ int main()
 
     while (true)
     {
+        clearScreen();
         printBoard();
         cout << "It is white's move" << endl;
         cout << "Pick a piece (example e2): ";
@@ -120,6 +261,7 @@ int main()
         }
 
         highlightSquares = getPossibleMoves(from);
+        clearScreen();
         printBoard();
 
         cout << "Move to (example e4): ";
@@ -134,6 +276,8 @@ int main()
         else
         {
             cout << "Invalid move.\n";
+            cin.ignore();
+            cin.get(); // wait
         }
 
         highlightSquares.clear();
