@@ -1,41 +1,51 @@
 #include <iostream>
-#include <iomanip> // for setw
+#include <iomanip>
 #include <string>
+#include <vector>
 using namespace std;
 
-const string whiteBg = "\033[47m";
-const string blackBg = "\033[100m";
-const string reset = "\033[0m";
-
-// ASCII piece representation: white = upper, black = lower
 string board[64];
+string redBg = "\033[41m"; // red background
+string whiteBg = "\033[47m"; // white background
+string blackBg = "\033[40m"; // black background
+string greenBg = "\033[42m"; // green background for moves
+string reset = "\033[0m";
+
+vector<int> highlightSquares;
 
 void initBoard()
 {
-    // Emoji chess pieces: white = row 7, black = row 0
-    string whiteBackRow[8] = {"🏰", "🐴", "🧙", "👸", "👑", "🧙", "🐴", "🏰"};
-    string blackBackRow[8] = {"🏯", "🐎", "🧛", "🧝", "🤴", "🧛", "🐎", "🏯"};
+    string whiteBackRow[8] = {"♖", "♘", "♗", "♕", "♔", "♗", "♘", "♖"};
+    string blackBackRow[8] = {"♜", "♞", "♝", "♛", "♚", "♝", "♞", "♜"};
 
-    for (int i = 8; i < 16; ++i)
-        board[i] = "🚶"; // Black pawn
-    for (int i = 48; i < 56; ++i)
-        board[i] = "🧍"; // White pawn
-
-    // Black back row
     for (int i = 0; i < 8; ++i)
         board[i] = blackBackRow[i];
-
-    // Empty
+    for (int i = 8; i < 16; ++i)
+        board[i] = "♟︎";
     for (int i = 16; i < 48; ++i)
         board[i] = " ";
-
-    // White back row
+    for (int i = 48; i < 56; ++i)
+        board[i] = "♙";
     for (int i = 56; i < 64; ++i)
         board[i] = whiteBackRow[i - 56];
 }
 
+bool isHighlighted(int index)
+{
+    for (int i : highlightSquares)
+        if (i == index)
+            return true;
+    return false;
+}
+
+void clearScreen()
+{
+    cout << "\033[2J\033[1H"; // ANSI escape code to clear the screen
+}
+
 void printBoard()
 {
+    // cout << "   a  b  c  d  e  f  g  h" << endl;
     for (int row = 7; row >= 0; --row)
     {
         cout << row + 1 << " ";
@@ -44,22 +54,90 @@ void printBoard()
             int index = row * 8 + col;
             bool isWhiteSquare = (row + col) % 2 == 0;
             string bg = isWhiteSquare ? whiteBg : blackBg;
-
-            cout << bg << " " << setw(2) << board[index] << " " << reset;
+            if (isHighlighted(index))
+                bg = greenBg;
+            cout << bg << " " << board[index] << " " << reset;
         }
-        cout << endl;
+        cout << " " << row + 1 << endl;
     }
+    cout << "   a  b  c  d  e  f  g  h" << endl;
+}
 
-    // Column labels
-    cout << "   ";
-    for (char c = 'a'; c <= 'h'; ++c)
-        cout << " " << setw(2) << c << " ";
-    cout << endl;
+int posToIndex(string pos)
+{
+    if (pos.length() != 2)
+        return -1;
+    int col = pos[0] - 'a';
+    int row = pos[1] - '1';
+    if (col < 0 || col > 7 || row < 0 || row > 7)
+        return -1;
+    row = 7 - row;
+    return row * 8 + col;
+}
+
+vector<int> getPossibleMoves(int index)
+{
+    vector<int> moves;
+    string piece = board[index];
+
+    
+    if (piece == "♙")
+    {
+        // White pawn simple move
+        int row = index / 8;
+        int col = index % 8;
+        if (row > 0 && board[(row - 1) * 8 + col] == " ")
+        {
+            moves.push_back((row - 1) * 8 + col);
+        }
+    }
+    // Add more rules for other pieces later
+    return moves;
+}
+
+void movePiece(int from, int to)
+{
+    board[to] = board[from];
+    board[from] = " ";
 }
 
 int main()
 {
     initBoard();
-    printBoard();
+
+    while (true)
+    {
+        printBoard();
+        cout << "It is white's move" << endl;
+        cout << "Pick a piece (example e2): ";
+        string pick;
+        cin >> pick;
+        int from = posToIndex(pick);
+        if (from == -1)
+        {
+            cout << "Invalid input, try again.\n";
+            continue;
+        }
+
+        highlightSquares = getPossibleMoves(from);
+        printBoard();
+
+        cout << "Move to (example e4): ";
+        string destination;
+        cin >> destination;
+        int to = posToIndex(destination);
+
+        if (to != -1 && isHighlighted(to))
+        {
+            movePiece(from, to);
+        }
+        else
+        {
+            cout << "Invalid move.\n";
+        }
+
+        highlightSquares.clear();
+    }
+
     return 0;
 }
