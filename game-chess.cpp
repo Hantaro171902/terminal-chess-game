@@ -2,286 +2,441 @@
 #include <iomanip>
 #include <string>
 #include <vector>
-using namespace std;
+#include <algorithm> // Required for std::find
 
-string board[64];
-string redBg = "\033[41m";   // red background
-string whiteBg = "\033[47m"; // white background
-string blackBg = "\033[40m"; // black background
-string greenBg = "\033[42m"; // green background for moves
-string reset = "\033[0m";
+// Define color codes for terminal output
+std::string redBg = "\033[41m";    // Red background
+std::string whiteBg = "\033[47m";  // White background
+std::string blackBg = "\033[40m";  // Black background
+std::string greenBg = "\033[42m";  // Green background for possible moves
+std::string reset = "\033[0m";     // Reset formatting
 
-vector<int> highlightSquares;
+// Forward declaration for Piece class (needed for board declaration)
+class Piece;
 
-void initBoard()
-{
-    string whiteBackRow[8] = {"♖", "♘", "♗", "♕", "♔", "♗", "♘", "♖"};
-    string blackBackRow[8] = {"♜", "♞", "♝", "♛", "♚", "♝", "♞", "♜"};
+// Global board representation using pointers to Piece objects
+std::vector<Piece*> board(64, nullptr);
+// List of squares to highlight (possible moves)
+std::vector<int> highlightSquares;
+// Track whose turn it is (true for White, false for Black)
+bool isWhiteTurn = true;
 
-    for (int i = 0; i < 8; ++i)
-        board[i] = blackBackRow[i];
-    for (int i = 8; i < 16; ++i)
-        board[i] = "♟︎";
-    for (int i = 16; i < 48; ++i)
-        board[i] = " ";
-    for (int i = 48; i < 56; ++i)
-        board[i] = "♙";
-    for (int i = 56; i < 64; ++i)
-        board[i] = whiteBackRow[i - 56];
+// --- Base Piece Class and Derived Classes ---
+// Abstract base class for all chess pieces
+class Piece {
+public:
+    bool isWhite;
+    std::string symbol;
+
+    Piece(bool isWhite, std::string symbol) : isWhite(isWhite), symbol(symbol) {}
+    // Virtual function to get all possible moves for a piece from a given index
+    virtual std::vector<int> getPossibleMoves(int index) const = 0;
+    // Virtual destructor for proper memory deallocation
+    virtual ~Piece() {}
+};
+
+// Pawn class
+class Pawn : public Piece {
+public:
+    Pawn(bool isWhite) : Piece(isWhite, isWhite ? "♙" : "♟︎") {}
+
+    std::vector<int> getPossibleMoves(int index) const override {
+        std::vector<int> moves;
+        int row = index / 8;
+        int col = index % 8;
+        int direction = isWhite ? -1 : 1; // White moves up (row decreases), Black moves down (row increases)
+
+        // Single step forward
+        int newRow = row + direction;
+        int newIndex = newRow * 8 + col;
+        if (newRow >= 0 && newRow < 8 && board[newIndex] == nullptr) {
+            moves.push_back(newIndex);
+        }
+
+        // Double step forward on first move
+        if (isWhite && row == 6 && board[newIndex] == nullptr && board[(row - 2) * 8 + col] == nullptr) {
+            moves.push_back((row - 2) * 8 + col);
+        } else if (!isWhite && row == 1 && board[newIndex] == nullptr && board[(row + 2) * 8 + col] == nullptr) {
+            moves.push_back((row + 2) * 8 + col);
+        }
+
+        // Captures (diagonal)
+        int captureCols[] = {col - 1, col + 1};
+        for (int c : captureCols) {
+            if (newRow >= 0 && newRow < 8 && c >= 0 && c < 8) {
+                int captureIndex = newRow * 8 + c;
+                if (board[captureIndex] != nullptr && board[captureIndex]->isWhite != isWhite) {
+                    moves.push_back(captureIndex);
+                }
+            }
+        }
+        return moves;
+    }
+};
+
+// Rook class
+class Rook : public Piece {
+public:
+    Rook(bool isWhite) : Piece(isWhite, isWhite ? "♖" : "♜") {}
+
+    std::vector<int> getPossibleMoves(int index) const override {
+        std::vector<int> moves;
+        int row = index / 8;
+        int col = index % 8;
+
+        // Directions: Up, Down, Left, Right
+        int dr[] = {-1, 1, 0, 0};
+        int dc[] = {0, 0, -1, 1};
+
+        for (int i = 0; i < 4; ++i) {
+            int r = row + dr[i];
+            int c = col + dc[i];
+            while (r >= 0 && r < 8 && c >= 0 && c < 8) {
+                int currentIdx = r * 8 + c;
+                if (board[currentIdx] == nullptr) { // Empty square
+                    moves.push_back(currentIdx);
+                } else { // Occupied square
+                    if (board[currentIdx]->isWhite != isWhite) { // Opponent's piece
+                        moves.push_back(currentIdx);
+                    }
+                    break; // Stop if square is occupied (cannot jump over)
+                }
+                r += dr[i];
+                c += dc[i];
+            }
+        }
+        return moves;
+    }
+};
+
+// Knight class
+class Knight : public Piece {
+public:
+    Knight(bool isWhite) : Piece(isWhite, isWhite ? "♘" : "♞") {}
+
+    std::vector<int> getPossibleMoves(int index) const override {
+        std::vector<int> moves;
+        int row = index / 8;
+        int col = index % 8;
+
+        // All 8 possible L-shaped moves for a knight
+        int dr[] = {-2, -2, -1, -1, 1, 1, 2, 2};
+        int dc[] = {-1, 1, -2, 2, -2, 2, -1, 1};
+
+        for (int i = 0; i < 8; ++i) {
+            int newRow = row + dr[i];
+            int newCol = col + dc[i];
+            if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
+                int newIndex = newRow * 8 + newCol;
+                if (board[newIndex] == nullptr || board[newIndex]->isWhite != isWhite) {
+                    moves.push_back(newIndex);
+                }
+            }
+        }
+        return moves;
+    }
+};
+
+// Bishop class
+class Bishop : public Piece {
+public:
+    Bishop(bool isWhite) : Piece(isWhite, isWhite ? "♗" : "♝") {}
+
+    std::vector<int> getPossibleMoves(int index) const override {
+        std::vector<int> moves;
+        int row = index / 8;
+        int col = index % 8;
+
+        // Directions: All 4 diagonals
+        int dr[] = {-1, -1, 1, 1};
+        int dc[] = {-1, 1, -1, 1};
+
+        for (int i = 0; i < 4; ++i) {
+            int r = row + dr[i];
+            int c = col + dc[i];
+            while (r >= 0 && r < 8 && c >= 0 && c < 8) {
+                int currentIdx = r * 8 + c;
+                if (board[currentIdx] == nullptr) { // Empty square
+                    moves.push_back(currentIdx);
+                } else { // Occupied square
+                    if (board[currentIdx]->isWhite != isWhite) { // Opponent's piece
+                        moves.push_back(currentIdx);
+                    }
+                    break; // Stop if square is occupied
+                }
+                r += dr[i];
+                c += dc[i];
+            }
+        }
+        return moves;
+    }
+};
+
+// Queen class
+class Queen : public Piece {
+public:
+    Queen(bool isWhite) : Piece(isWhite, isWhite ? "♕" : "♛") {}
+
+    std::vector<int> getPossibleMoves(int index) const override {
+        std::vector<int> moves;
+        int row = index / 8;
+        int col = index % 8;
+
+        // Queen moves like a Rook (horizontal/vertical)
+        int rook_dr[] = {-1, 1, 0, 0};
+        int rook_dc[] = {0, 0, -1, 1};
+        for (int i = 0; i < 4; ++i) {
+            int r = row + rook_dr[i];
+            int c = col + rook_dc[i];
+            while (r >= 0 && r < 8 && c >= 0 && c < 8) {
+                int currentIdx = r * 8 + c;
+                if (board[currentIdx] == nullptr) {
+                    moves.push_back(currentIdx);
+                } else {
+                    if (board[currentIdx]->isWhite != isWhite) {
+                        moves.push_back(currentIdx);
+                    }
+                    break;
+                }
+                r += rook_dr[i];
+                c += rook_dc[i];
+            }
+        }
+
+        // Queen moves like a Bishop (diagonal)
+        int bishop_dr[] = {-1, -1, 1, 1};
+        int bishop_dc[] = {-1, 1, -1, 1};
+        for (int i = 0; i < 4; ++i) {
+            int r = row + bishop_dr[i];
+            int c = col + bishop_dc[i];
+            while (r >= 0 && r < 8 && c >= 0 && c < 8) {
+                int currentIdx = r * 8 + c;
+                if (board[currentIdx] == nullptr) {
+                    moves.push_back(currentIdx);
+                } else {
+                    if (board[currentIdx]->isWhite != isWhite) {
+                        moves.push_back(currentIdx);
+                    }
+                    break;
+                }
+                r += bishop_dr[i];
+                c += bishop_dc[i];
+            }
+        }
+        return moves;
+    }
+};
+
+// King class
+class King : public Piece {
+public:
+    King(bool isWhite) : Piece(isWhite, isWhite ? "♔" : "♚") {}
+
+    std::vector<int> getPossibleMoves(int index) const override {
+        std::vector<int> moves;
+        int row = index / 8;
+        int col = index % 8;
+
+        // All 8 surrounding squares
+        int dr[] = {-1, -1, -1, 0, 0, 1, 1, 1};
+        int dc[] = {-1, 0, 1, -1, 1, -1, 0, 1};
+
+        for (int i = 0; i < 8; ++i) {
+            int newRow = row + dr[i];
+            int newCol = col + dc[i];
+            if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
+                int newIndex = newRow * 8 + newCol;
+                if (board[newIndex] == nullptr || board[newIndex]->isWhite != isWhite) {
+                    moves.push_back(newIndex);
+                }
+            }
+        }
+        return moves;
+    }
+};
+
+// --- Game Logic Functions ---
+
+// Initializes the chessboard with pieces in their starting positions
+void initializeBoard() {
+    // Clear any existing pieces
+    for (int i = 0; i < 64; ++i) {
+        if (board[i] != nullptr) {
+            delete board[i];
+            board[i] = nullptr;
+        }
+    }
+
+    // Black pieces
+    board[0] = new Rook(false);
+    board[1] = new Knight(false);
+    board[2] = new Bishop(false);
+    board[3] = new Queen(false);
+    board[4] = new King(false);
+    board[5] = new Bishop(false);
+    board[6] = new Knight(false);
+    board[7] = new Rook(false);
+    for (int i = 8; i < 16; ++i) {
+        board[i] = new Pawn(false);
+    }
+
+    // White pieces
+    for (int i = 48; i < 56; ++i) {
+        board[i] = new Pawn(true);
+    }
+    board[56] = new Rook(true);
+    board[57] = new Knight(true);
+    board[58] = new Bishop(true);
+    board[59] = new Queen(true);
+    board[60] = new King(true);
+    board[61] = new Bishop(true);
+    board[62] = new Knight(true);
+    board[63] = new Rook(true);
 }
 
-bool isHighlighted(int index)
-{
-    for (int i : highlightSquares)
-        if (i == index)
+// Checks if a given index is one of the highlighted squares
+bool isSquareHighlighted(int index) {
+    for (int i : highlightSquares) {
+        if (i == index) {
             return true;
+        }
+    }
     return false;
 }
 
-void clearScreen()
-{
-    cout << "\033[2J\033[1H"; // ANSI escape code to clear the screen
+// Clears the terminal screen
+void clearTerminalScreen() {
+    std::cout << "\033[2J\033[1H";
 }
 
-void printBoard()
-{
-    // cout << "   a  b  c  d  e  f  g  h" << endl;
-    for (int row = 7; row >= 0; --row)
-    {
-        cout << row + 1 << " ";
-        for (int col = 0; col < 8; ++col)
-        {
+// Prints the current state of the board to the terminal
+void printBoard() {
+    for (int row = 0; row <= 7; ++row) { // Iterate from row 8 down to 1
+        std::cout << row + 1 << " "; // Print row number
+        for (int col = 0; col < 8; ++col) {
             int index = row * 8 + col;
+            // Determine square color (alternating)
             bool isWhiteSquare = (row + col) % 2 == 0;
-            string bg = isWhiteSquare ? whiteBg : blackBg;
-            if (isHighlighted(index))
-                bg = greenBg;
-            cout << bg << " " << board[index] << " " << reset;
+            std::string bgColor = isWhiteSquare ? whiteBg : blackBg;
+
+            // Highlight possible moves
+            if (isSquareHighlighted(index)) {
+                bgColor = greenBg;
+            }
+            
+            // Print the square with its background and piece symbol
+            std::cout << bgColor << " " << (board[index] ? board[index]->symbol : " ") << " " << reset;
         }
-        cout << " " << row + 1 << endl;
+        std::cout << std::endl; // New line after each row
     }
-    cout << "   a  b  c  d  e  f  g  h" << endl;
+    // Print column labels
+    std::cout << "   a  b  c  d  e  f  g  h" << std::endl;
 }
 
-int posToIndex(string pos)
-{
-    if (pos.length() != 2)
-        return -1;
-    int col = pos[0] - 'a';
-    int row = pos[1] - '1';
-    if (col < 0 || col > 7 || row < 0 || row > 7)
-        return -1;
-    row = 7 - row;
-    return row * 8 + col;
+// Converts a chess position string (e.g., "e2") to a board index (0-63)
+int convertPosToIndex(const std::string& pos) {
+    if (pos.length() != 2) {
+        return -1; // Invalid format
+    }
+    int col = pos[0] - 'a'; // 'a' to 'h' -> 0 to 7
+    int row = pos[1] - '1'; // '1' to '8' -> 0 to 7
+
+    if (col < 0 || col > 7 || row < 0 || row > 7) {
+        return -1; // Out of bounds
+    }
+    // Adjust row to match 0-based indexing from top (rank 8) to bottom (rank 1)
+    // Board is stored from 0 (a8) to 63 (h1)
+    return (7 - row) * 8 + col;
 }
 
-bool isInsideBoard(int row, int col)
-{
-    return row >= 0 && row < 8 && col >= 0 && col < 8;
+// Executes a move on the board
+void executeMove(int fromIndex, int toIndex) {
+    // If there's a piece at the destination, delete it (capture)
+    if (board[toIndex] != nullptr) {
+        delete board[toIndex];
+    }
+    board[toIndex] = board[fromIndex]; // Move the piece
+    board[fromIndex] = nullptr;        // Clear the original square
 }
 
-vector<int> getPossibleMoves(int index)
-{
-    vector<int> moves;
-    string piece = board[index];
-    int row = index / 8;
-    int col = index % 8;
+// --- Main Game Loop ---
+int main() {
+    initializeBoard(); // Set up the initial board
 
-    if (piece == "♙")
-    { // White pawn
-        if (isInsideBoard(row - 1, col) && board[(row - 1) * 8 + col] == " ")
-            moves.push_back((row - 1) * 8 + col);
-    }
-    else if (piece == "♖")
-    { // Rook
-        // Up
-        for (int r = row - 1; r >= 0; --r)
-        {
-            int i = r * 8 + col;
-            if (board[i] == " ")
-                moves.push_back(i);
-            else
-                break;
-        }
-        // Down
-        for (int r = row + 1; r < 8; ++r)
-        {
-            int i = r * 8 + col;
-            if (board[i] == " ")
-                moves.push_back(i);
-            else
-                break;
-        }
-        // Left
-        for (int c = col - 1; c >= 0; --c)
-        {
-            int i = row * 8 + c;
-            if (board[i] == " ")
-                moves.push_back(i);
-            else
-                break;
-        }
-        // Right
-        for (int c = col + 1; c < 8; ++c)
-        {
-            int i = row * 8 + c;
-            if (board[i] == " ")
-                moves.push_back(i);
-            else
-                break;
-        }
-    }
-    else if (piece == "♗")
-    { // Bishop
-        // 4 diagonals
-        for (int dr = -1, dc = -1; isInsideBoard(row + dr, col + dc); --dr, --dc)
-        {
-            int i = (row + dr) * 8 + (col + dc);
-            if (board[i] == " ")
-                moves.push_back(i);
-            else
-                break;
-        }
-        for (int dr = -1, dc = 1; isInsideBoard(row + dr, col + dc); --dr, ++dc)
-        {
-            int i = (row + dr) * 8 + (col + dc);
-            if (board[i] == " ")
-                moves.push_back(i);
-            else
-                break;
-        }
-        for (int dr = 1, dc = -1; isInsideBoard(row + dr, col + dc); ++dr, --dc)
-        {
-            int i = (row + dr) * 8 + (col + dc);
-            if (board[i] == " ")
-                moves.push_back(i);
-            else
-                break;
-        }
-        for (int dr = 1, dc = 1; isInsideBoard(row + dr, col + dc); ++dr, ++dc)
-        {
-            int i = (row + dr) * 8 + (col + dc);
-            if (board[i] == " ")
-                moves.push_back(i);
-            else
-                break;
-        }
-    }
-    else if (piece == "♘")
-    { // Knight
-        int movesKnight[8][2] = {
-            {-2, -1}, {-2, 1}, {-1, -2}, {-1, 2}, {1, -2}, {1, 2}, {2, -1}, {2, 1}};
-        for (auto m : movesKnight)
-        {
-            int r = row + m[0];
-            int c = col + m[1];
-            if (isInsideBoard(r, c) && board[r * 8 + c] == " ")
-                moves.push_back(r * 8 + c);
-        }
-    }
-    else if (piece == "♕")
-    { // Queen
-        // Rook + Bishop moves
-        highlightSquares.clear();
-        vector<int> rookMoves = getPossibleMoves(index); // Call rook code manually or inline
-        highlightSquares = rookMoves;
-        // Diagonals manually as Bishop
-        for (int dr = -1, dc = -1; isInsideBoard(row + dr, col + dc); --dr, --dc)
-        {
-            int i = (row + dr) * 8 + (col + dc);
-            if (board[i] == " ")
-                moves.push_back(i);
-            else
-                break;
-        }
-        for (int dr = -1, dc = 1; isInsideBoard(row + dr, col + dc); --dr, ++dc)
-        {
-            int i = (row + dr) * 8 + (col + dc);
-            if (board[i] == " ")
-                moves.push_back(i);
-            else
-                break;
-        }
-        for (int dr = 1, dc = -1; isInsideBoard(row + dr, col + dc); ++dr, --dc)
-        {
-            int i = (row + dr) * 8 + (col + dc);
-            if (board[i] == " ")
-                moves.push_back(i);
-            else
-                break;
-        }
-        for (int dr = 1, dc = 1; isInsideBoard(row + dr, col + dc); ++dr, ++dc)
-        {
-            int i = (row + dr) * 8 + (col + dc);
-            if (board[i] == " ")
-                moves.push_back(i);
-            else
-                break;
-        }
-    }
-    else if (piece == "♔")
-    { // King
-        int drs[] = {-1, -1, -1, 0, 0, 1, 1, 1};
-        int dcs[] = {-1, 0, 1, -1, 1, -1, 0, 1};
-        for (int d = 0; d < 8; ++d)
-        {
-            int r = row + drs[d];
-            int c = col + dcs[d];
-            if (isInsideBoard(r, c) && board[r * 8 + c] == " ")
-                moves.push_back(r * 8 + c);
-        }
-    }
+    while (true) {
+        clearTerminalScreen(); // Clear terminal before printing
+        printBoard();          // Display the current board
 
-    return moves;
-}
+        // Display current turn
+        std::cout << (isWhiteTurn ? "White's turn" : "Black's turn") << ". Enter move (e.g. e2 e4): ";
+        std::string fromStr, toStr;
+        std::cin >> fromStr >> toStr;
 
-void movePiece(int from, int to)
-{
-    board[to] = board[from];
-    board[from] = " ";
-}
+        int fromIndex = convertPosToIndex(fromStr);
+        int toIndex = convertPosToIndex(toStr);
 
-int main()
-{
-    initBoard();
-
-    while (true)
-    {
-        clearScreen();
-        printBoard();
-        cout << "It is white's move" << endl;
-        cout << "Pick a piece (example e2): ";
-        string pick;
-        cin >> pick;
-        int from = posToIndex(pick);
-        if (from == -1)
-        {
-            cout << "Invalid input, try again.\n";
+        // Input validation
+        if (fromIndex == -1 || toIndex == -1) {
+            clearTerminalScreen();
+            printBoard();
+            std::cout << "Invalid input format or coordinates. Please use format like 'e2 e4'.\n";
+            std::cin.ignore(); // Clear invalid input
+            std::cin.get();    // Wait for user to press enter
+            continue;
+        }
+        
+        // Check if there's a piece at the source square
+        if (board[fromIndex] == nullptr) {
+            clearTerminalScreen();
+            printBoard();
+            std::cout << "No piece at the source square '" << fromStr << "'.\n";
+            std::cin.ignore();
+            std::cin.get();
             continue;
         }
 
-        highlightSquares = getPossibleMoves(from);
-        clearScreen();
-        printBoard();
-
-        cout << "Move to (example e4): ";
-        string destination;
-        cin >> destination;
-        int to = posToIndex(destination);
-
-        if (to != -1 && isHighlighted(to))
-        {
-            movePiece(from, to);
-        }
-        else
-        {
-            cout << "Invalid move.\n";
-            cin.ignore();
-            cin.get(); // wait
+        // Check if it's the correct turn for the selected piece
+        if ((isWhiteTurn && !board[fromIndex]->isWhite) || (!isWhiteTurn && board[fromIndex]->isWhite)) {
+            clearTerminalScreen();
+            printBoard();
+            std::cout << "It's " << (isWhiteTurn ? "White's" : "Black's") << " turn. You selected an opponent's piece.\n";
+            std::cin.ignore();
+            std::cin.get();
+            continue;
         }
 
-        highlightSquares.clear();
+        // Get possible moves for the selected piece
+        highlightSquares = board[fromIndex]->getPossibleMoves(fromIndex);
+
+        // Check if the destination is a valid move
+        bool isValidMove = false;
+        for (int possibleMove : highlightSquares) {
+            if (possibleMove == toIndex) {
+                isValidMove = true;
+                break;
+            }
+        }
+
+        if (isValidMove) {
+            executeMove(fromIndex, toIndex); // Perform the move
+            isWhiteTurn = !isWhiteTurn;      // Switch turns
+            highlightSquares.clear();        // Clear highlights after move
+        } else {
+            clearTerminalScreen();
+            printBoard(); // Re-print board with highlights for clarity
+            std::cout << "Invalid move for " << board[fromIndex]->symbol << " from " << fromStr << " to " << toStr << ".\n";
+            std::cout << "Possible moves are highlighted in green.\n";
+            std::cin.ignore();
+            std::cin.get(); // Wait for user to press enter
+            highlightSquares.clear(); // Clear highlights if move is invalid
+        }
     }
 
+    // Clean up allocated memory (though the infinite loop prevents reaching here in typical game flow)
+    for (int i = 0; i < 64; ++i) {
+        if (board[i] != nullptr) {
+            delete board[i];
+        }
+    }
     return 0;
 }
