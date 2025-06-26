@@ -21,6 +21,10 @@ std::vector<int> highlightSquares;
 // Track whose turn it is (true for White, false for Black)
 bool isWhiteTurn = true;
 
+// New: Lists to store captured pieces
+std::vector<Piece*> capturedWhitePieces;
+std::vector<Piece*> capturedBlackPieces;
+
 // --- Base Piece Class and Derived Classes ---
 // Abstract base class for all chess pieces
 class Piece {
@@ -259,13 +263,21 @@ public:
 
 // Initializes the chessboard with pieces in their starting positions
 void initializeBoard() {
-    // Clear any existing pieces
+    // Clear any existing pieces and captured pieces
     for (int i = 0; i < 64; ++i) {
         if (board[i] != nullptr) {
             delete board[i];
             board[i] = nullptr;
         }
     }
+    for (Piece* p : capturedWhitePieces) {
+        delete p;
+    }
+    capturedWhitePieces.clear();
+    for (Piece* p : capturedBlackPieces) {
+        delete p;
+    }
+    capturedBlackPieces.clear();
 
     // Black pieces
     board[0] = new Rook(false);
@@ -292,16 +304,14 @@ void initializeBoard() {
     board[61] = new Bishop(true);
     board[62] = new Knight(true);
     board[63] = new Rook(true);
+
+    isWhiteTurn = true; // Reset turn for a new game
 }
 
 // Checks if a given index is one of the highlighted squares
 bool isSquareHighlighted(int index) {
-    for (int i : highlightSquares) {
-        if (i == index) {
-            return true;
-        }
-    }
-    return false;
+    // Use std::find for better readability and potentially performance
+    return std::find(highlightSquares.begin(), highlightSquares.end(), index) != highlightSquares.end();
 }
 
 // Clears the terminal screen
@@ -311,6 +321,13 @@ void clearTerminalScreen() {
 
 // Prints the current state of the board to the terminal
 void printBoard() {
+    // Display captured pieces on the side
+    std::cout << "Captured Black Pieces: ";
+    for (Piece* p : capturedBlackPieces) {
+        std::cout << p->symbol << " ";
+    }
+    std::cout << std::endl;
+
     for (int row = 0; row <= 7; ++row) { // Iterate from row 8 down to 1
         std::cout << row + 1 << " "; // Print row number
         for (int col = 0; col < 8; ++col) {
@@ -331,6 +348,12 @@ void printBoard() {
     }
     // Print column labels
     std::cout << "   a  b  c  d  e  f  g  h" << std::endl;
+
+    std::cout << "Captured White Pieces: ";
+    for (Piece* p : capturedWhitePieces) {
+        std::cout << p->symbol << " ";
+    }
+    std::cout << std::endl;
 }
 
 // Converts a chess position string (e.g., "e2") to a board index (0-63)
@@ -351,9 +374,18 @@ int convertPosToIndex(const std::string& pos) {
 
 // Executes a move on the board
 void executeMove(int fromIndex, int toIndex) {
-    // If there's a piece at the destination, delete it (capture)
+    // If there's a piece at the destination, it means a capture
     if (board[toIndex] != nullptr) {
-        delete board[toIndex];
+        // Add the captured piece to the appropriate list
+        if (board[toIndex]->isWhite) {
+            capturedWhitePieces.push_back(board[toIndex]);
+        } else {
+            capturedBlackPieces.push_back(board[toIndex]);
+        }
+        // Inform the player about the capture
+        std::cout << (board[fromIndex]->isWhite ? "White's " : "Black's ") << board[fromIndex]->symbol 
+                  << " captured " << (board[toIndex]->isWhite ? "White's " : "Black's ") 
+                  << board[toIndex]->symbol << "!\n";
     }
     board[toIndex] = board[fromIndex]; // Move the piece
     board[fromIndex] = nullptr;        // Clear the original square
@@ -363,7 +395,6 @@ void executeMove(int fromIndex, int toIndex) {
 int main() {
     initializeBoard(); // Set up the initial board
 
-<<<<<<< HEAD
     while (true) {
         clearTerminalScreen(); // Clear terminal before printing
         printBoard();          // Display the current board
@@ -376,172 +407,6 @@ int main() {
         int fromIndex = convertPosToIndex(fromStr);
         int toIndex = convertPosToIndex(toStr);
 
-=======
-<<<<<<< HEAD
-    if (piece == "♙")
-    { // White pawn
-      // Single move forward
-        if (isInsideBoard(row - 1, col) && board[(row - 1) * 8 + col] == " ")
-            moves.push_back((row - 1) * 8 + col);
-
-        // Double move forward from starting position
-        if (row == 6 && board[(row - 1) * 8 + col] == " " && board[(row - 2) * 8 + col] == " ")
-            moves.push_back((row - 2) * 8 + col);
-    }
-    else if (piece == "♖")
-    { // Rook
-        // Up
-        for (int r = row - 1; r >= 0; --r)
-        {
-            int i = r * 8 + col;
-            if (board[i] == " ")
-                moves.push_back(i);
-            else
-                break;
-        }
-        // Down
-        for (int r = row + 1; r < 8; ++r)
-        {
-            int i = r * 8 + col;
-            if (board[i] == " ")
-                moves.push_back(i);
-            else
-                break;
-        }
-        // Left
-        for (int c = col - 1; c >= 0; --c)
-        {
-            int i = row * 8 + c;
-            if (board[i] == " ")
-                moves.push_back(i);
-            else
-                break;
-        }
-        // Right
-        for (int c = col + 1; c < 8; ++c)
-        {
-            int i = row * 8 + c;
-            if (board[i] == " ")
-                moves.push_back(i);
-            else
-                break;
-        }
-    }
-    else if (piece == "♗")
-    { // Bishop
-        // 4 diagonals
-        for (int dr = -1, dc = -1; isInsideBoard(row + dr, col + dc); --dr, --dc)
-        {
-            int i = (row + dr) * 8 + (col + dc);
-            if (board[i] == " ")
-                moves.push_back(i);
-            else
-                break;
-        }
-        for (int dr = -1, dc = 1; isInsideBoard(row + dr, col + dc); --dr, ++dc)
-        {
-            int i = (row + dr) * 8 + (col + dc);
-            if (board[i] == " ")
-                moves.push_back(i);
-            else
-                break;
-        }
-        for (int dr = 1, dc = -1; isInsideBoard(row + dr, col + dc); ++dr, --dc)
-        {
-            int i = (row + dr) * 8 + (col + dc);
-            if (board[i] == " ")
-                moves.push_back(i);
-            else
-                break;
-        }
-        for (int dr = 1, dc = 1; isInsideBoard(row + dr, col + dc); ++dr, ++dc)
-        {
-            int i = (row + dr) * 8 + (col + dc);
-            if (board[i] == " ")
-                moves.push_back(i);
-            else
-                break;
-        }
-    }
-    else if (piece == "♘")
-    { // Knight
-        int movesKnight[8][2] = {
-            {-2, -1}, {-2, 1}, {-1, -2}, {-1, 2}, {1, -2}, {1, 2}, {2, -1}, {2, 1}};
-        for (auto m : movesKnight)
-        {
-            int r = row + m[0];
-            int c = col + m[1];
-            if (isInsideBoard(r, c) && board[r * 8 + c] == " ")
-                moves.push_back(r * 8 + c);
-        }
-    }
-    else if (piece == "♕")
-    { // Queen
-        // Rook + Bishop moves
-        highlightSquares.clear();
-        vector<int> rookMoves = getPossibleMoves(index); // Call rook code manually or inline
-        highlightSquares = rookMoves;
-        // Diagonals manually as Bishop
-        for (int dr = -1, dc = -1; isInsideBoard(row + dr, col + dc); --dr, --dc)
-        {
-            int i = (row + dr) * 8 + (col + dc);
-            if (board[i] == " ")
-                moves.push_back(i);
-            else
-                break;
-        }
-        for (int dr = -1, dc = 1; isInsideBoard(row + dr, col + dc); --dr, ++dc)
-        {
-            int i = (row + dr) * 8 + (col + dc);
-            if (board[i] == " ")
-                moves.push_back(i);
-            else
-                break;
-        }
-        for (int dr = 1, dc = -1; isInsideBoard(row + dr, col + dc); ++dr, --dc)
-        {
-            int i = (row + dr) * 8 + (col + dc);
-            if (board[i] == " ")
-                moves.push_back(i);
-            else
-                break;
-        }
-        for (int dr = 1, dc = 1; isInsideBoard(row + dr, col + dc); ++dr, ++dc)
-        {
-            int i = (row + dr) * 8 + (col + dc);
-            if (board[i] == " ")
-                moves.push_back(i);
-            else
-                break;
-        }
-    }
-    else if (piece == "♔")
-    { // King
-        int drs[] = {-1, -1, -1, 0, 0, 1, 1, 1};
-        int dcs[] = {-1, 0, 1, -1, 1, -1, 0, 1};
-        for (int d = 0; d < 8; ++d)
-        {
-            int r = row + drs[d];
-            int c = col + dcs[d];
-            if (isInsideBoard(r, c) && board[r * 8 + c] == " ")
-                moves.push_back(r * 8 + c);
-        }
-    }
-=======
-    while (true) {
-        clearTerminalScreen(); // Clear terminal before printing
-        printBoard();          // Display the current board
->>>>>>> 929ee96 (update board)
-
-        // Display current turn
-        std::cout << (isWhiteTurn ? "White's turn" : "Black's turn") << ". Enter move (e.g. e2 e4): ";
-        std::string fromStr, toStr;
-        std::cin >> fromStr >> toStr;
-
-        int fromIndex = convertPosToIndex(fromStr);
-        int toIndex = convertPosToIndex(toStr);
-
->>>>>>> 7bb121c (update board)
         // Input validation
         if (fromIndex == -1 || toIndex == -1) {
             clearTerminalScreen();
@@ -577,17 +442,19 @@ int main() {
 
         // Check if the destination is a valid move
         bool isValidMove = false;
-        for (int possibleMove : highlightSquares) {
-            if (possibleMove == toIndex) {
-                isValidMove = true;
-                break;
-            }
+        // Using std::find for checking if 'toIndex' is in 'highlightSquares'
+        if (std::find(highlightSquares.begin(), highlightSquares.end(), toIndex) != highlightSquares.end()) {
+            isValidMove = true;
         }
 
         if (isValidMove) {
-            executeMove(fromIndex, toIndex); // Perform the move
+            executeMove(fromIndex, toIndex); // Perform the move (now includes capture logic)
             isWhiteTurn = !isWhiteTurn;      // Switch turns
             highlightSquares.clear();        // Clear highlights after move
+            // Pause briefly to let the "captured" message be seen before screen clears
+            std::cin.ignore();
+            std::cout << "Press Enter to continue...";
+            std::cin.get(); 
         } else {
             clearTerminalScreen();
             printBoard(); // Re-print board with highlights for clarity
@@ -600,10 +467,19 @@ int main() {
     }
 
     // Clean up allocated memory (though the infinite loop prevents reaching here in typical game flow)
+    // This part should technically be called when the game ends (e.g., checkmate or stalemate)
+    // For now, it's here for completeness if the loop were to break.
     for (int i = 0; i < 64; ++i) {
         if (board[i] != nullptr) {
             delete board[i];
         }
     }
+    for (Piece* p : capturedWhitePieces) {
+        delete p;
+    }
+    for (Piece* p : capturedBlackPieces) {
+        delete p;
+    }
+
     return 0;
 }
