@@ -5,7 +5,7 @@
 #include <vector>
 #include <string>
 
-usiung namespace std;
+using namespace std;
 
 // Forward declaration of Piece class
 class Piece;

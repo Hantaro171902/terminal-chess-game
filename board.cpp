@@ -32,8 +32,8 @@ void printBoard() {
     }
     cout << endl;
 
-    for (int row = 0; row <= 7; ++row) { // Iterate from row 8 down to 1
-        cout << row + 1 << " "; // Print row number
+    for (int row = 0; row < 8; ++row) { // Iterate from row 8 down to 1
+        cout << 8 - row << " "; // Print row number
         for (int col = 0; col < 8; ++col) {
             int index = row * 8 + col;
             // Determine square color (alternating)
