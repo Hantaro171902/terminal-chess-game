@@ -1,4 +1,4 @@
-#include <"piece.h"
+#include "piece.h"
 #include <algorithm> // For find, if need in future piece logic
 
 // Global board definition (declared extern in Piece.h)
@@ -11,6 +11,7 @@
 // Base Piece class implementation
 
 using namespace std;
+Piece::Piece(bool isWhite, std::string symbol) : isWhite(isWhite), symbol(symbol) {}
 
 // Pawn class implementation
 Pawn::Pawn(bool isWhite) : Piece(isWhite, isWhite ? "♙" : "♟︎") {}

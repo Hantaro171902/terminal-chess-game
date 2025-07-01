@@ -31,7 +31,7 @@ class Pawn : public Piece {
 public:
     Pawn(bool isWhite);
     vector<int> getPossibleMoves(int index) const override;
-}
+};
 
 // Rook class
 class Rook : public Piece {
